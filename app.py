@@ -196,7 +196,7 @@ st.markdown(CUSTOM_CSS, unsafe_allow_html=True)
 st.markdown(
     """
     <div class="hero-center">
-      <h3>Image Face Swap (Preview)</h3>
+      <h3>Image Face Swap</h3>
       <p>
         <a href="https://www.face-swap.co/?utm_source=streamlit_faceswap&utm_medium=subtitle" target="_blank">
           face-swap.co
