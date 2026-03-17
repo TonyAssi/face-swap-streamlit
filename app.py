@@ -21,6 +21,22 @@ def load_models():
 
 app, swapper = load_models()
 
+def swap_faces(src_pil, dest_pil):
+    src_img = np.array(src_pil)
+    dest_img = np.array(dest_pil)
+
+    src_faces = app.get(src_img)
+    dest_faces = app.get(dest_img)
+
+    if len(src_faces) == 0 or len(dest_faces) == 0:
+        raise ValueError("No faces detected in one of the images. Try clearer, front-facing photos.")
+
+    source_face = src_faces[0]
+    dest_face = dest_faces[0]
+
+    result = swapper.get(dest_img, dest_face, source_face, paste_back=True)
+    return Image.fromarray(np.uint8(result)).convert("RGB")
+
 st.title("Image Face Swap (Preview)")
 st.markdown(
     """
@@ -61,10 +77,17 @@ with col1:
 
 with col2:
     st.subheader("Result")
-    st.info("Result image will appear here.")
 
-if run_button:
-    if source_pil is None or target_pil is None:
-        st.error("Please upload both a source and a target image.")
+    if run_button:
+        if source_pil is None or target_pil is None:
+            st.error("Please upload both a source and a target image.")
+        else:
+            try:
+                with st.spinner("Swapping face..."):
+                    out_img = swap_faces(source_pil, target_pil)
+                st.image(out_img, caption="Result", use_container_width=True)
+                st.success("Face swap complete.")
+            except Exception as e:
+                st.error(str(e))
     else:
-        st.success("Models loaded correctly. Next we’ll add the swap logic.")
+        st.info("Result image will appear here.")
