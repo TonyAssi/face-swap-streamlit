@@ -1,44 +1,133 @@
-import streamlit as st
-from PIL import Image
+import os
+import tempfile
+from typing import Union, Any, Optional
+
 import numpy as np
-import insightface
-from insightface.app import FaceAnalysis
+from PIL import Image
+import streamlit as st
+from gradio_client import Client, handle_file
 
-st.set_page_config(page_title="Image Face Swap", layout="wide")
 
-assert insightface.__version__ >= "0.7"
+ImageLike = Union[str, np.ndarray, Image.Image]
+
+SPACE_ID = os.getenv("FACE_SWAP_SPACE_ID", "tonyassi/face-swap")
+API_NAME = os.getenv("FACE_SWAP_API_NAME", "/swap_faces")
+
+
+class FaceSwapClientError(Exception):
+    pass
+
+
+class InvalidImageError(FaceSwapClientError):
+    pass
+
+
+class RemoteInitError(FaceSwapClientError):
+    pass
+
+
+class RemoteCallError(FaceSwapClientError):
+    pass
+
+
+_CLIENT: Optional[Client] = None
 
 
 @st.cache_resource
-def load_models():
-    app = FaceAnalysis(name="buffalo_l")
-    app.prepare(ctx_id=-1, det_size=(640, 640))  # CPU for Streamlit Cloud
-    swapper = insightface.model_zoo.get_model(
-        "inswapper_128.onnx",
-        download=True,
-        download_zip=True
+def get_client() -> Client:
+    try:
+        return Client(SPACE_ID, verbose=False)
+    except Exception as e:
+        raise RemoteInitError(
+            f"Failed to initialize Gradio Client for Space '{SPACE_ID}'."
+        ) from e
+
+
+def _to_temp_png_path(img: ImageLike) -> str:
+    if img is None:
+        raise InvalidImageError("Image is None.")
+
+    if isinstance(img, str):
+        if not os.path.exists(img):
+            raise InvalidImageError(f"File not found: {img}")
+        return img
+
+    if isinstance(img, Image.Image):
+        pil = img.convert("RGB")
+        tmp = tempfile.NamedTemporaryFile(suffix=".png", delete=False)
+        tmp.close()
+        pil.save(tmp.name, format="PNG")
+        return tmp.name
+
+    if isinstance(img, np.ndarray):
+        arr = img
+        if arr.ndim != 3 or arr.shape[2] not in (3, 4):
+            raise InvalidImageError("Numpy image must be HxWx3 or HxWx4.")
+
+        if arr.dtype != np.uint8:
+            arr = np.clip(arr, 0, 255).astype(np.uint8)
+
+        if arr.shape[2] == 4:
+            arr = arr[:, :, :3]
+
+        pil = Image.fromarray(arr).convert("RGB")
+        tmp = tempfile.NamedTemporaryFile(suffix=".png", delete=False)
+        tmp.close()
+        pil.save(tmp.name, format="PNG")
+        return tmp.name
+
+    raise InvalidImageError(
+        f"Unsupported image type: {type(img)}. Use str, PIL.Image, or numpy."
     )
-    return app, swapper
 
 
-app, swapper = load_models()
+def _cleanup_temp(path: str, original_input: ImageLike):
+    try:
+        if not isinstance(original_input, str) and path and os.path.exists(path):
+            os.remove(path)
+    except Exception:
+        pass
 
 
-def swap_faces(src_pil, dest_pil):
-    src_img = np.array(src_pil)
-    dest_img = np.array(dest_pil)
+def _normalize_result_to_pil(result: Any) -> Image.Image:
+    if isinstance(result, dict) and "path" in result and result["path"]:
+        return Image.open(result["path"]).convert("RGB")
 
-    src_faces = app.get(src_img)
-    dest_faces = app.get(dest_img)
+    if isinstance(result, str) and os.path.exists(result):
+        return Image.open(result).convert("RGB")
 
-    if len(src_faces) == 0 or len(dest_faces) == 0:
-        raise ValueError("No faces detected in one of the images. Try clearer, front-facing photos.")
+    if isinstance(result, (list, tuple)) and result:
+        return _normalize_result_to_pil(result[0])
 
-    source_face = src_faces[0]
-    dest_face = dest_faces[0]
+    if isinstance(result, Image.Image):
+        return result.convert("RGB")
 
-    result = swapper.get(dest_img, dest_face, source_face, paste_back=True)
-    return Image.fromarray(np.uint8(result)).convert("RGB")
+    raise RemoteCallError(f"Unexpected result type from Space: {type(result)}")
+
+
+def swap_faces(src_img: ImageLike, dest_img: ImageLike) -> Image.Image:
+    client = get_client()
+
+    src_path = _to_temp_png_path(src_img)
+    dest_path = _to_temp_png_path(dest_img)
+
+    try:
+        result = client.predict(
+            src_img=handle_file(src_path),
+            dest_img=handle_file(dest_path),
+            api_name=API_NAME,
+        )
+        return _normalize_result_to_pil(result)
+
+    except Exception as e:
+        raise RemoteCallError(
+            f"Remote face swap call failed for Space '{SPACE_ID}' "
+            f"with api_name '{API_NAME}'."
+        ) from e
+
+    finally:
+        _cleanup_temp(src_path, src_img)
+        _cleanup_temp(dest_path, dest_img)
 
 
 CUSTOM_CSS = """
@@ -133,6 +222,7 @@ CUSTOM_CSS = """
 </style>
 """
 
+st.set_page_config(page_title="Image Face Swap", layout="wide")
 st.markdown(CUSTOM_CSS, unsafe_allow_html=True)
 
 st.markdown(
@@ -158,8 +248,8 @@ st.markdown(
         </a>
       </p>
       <p>
-        <strong>Free preview</strong> runs on CPU and may be limited in resolution to keep it fast.<br>
-        Want full-quality <strong>HD AI face swap</strong> with GPU speed?
+        <strong>Free preview</strong> runs on shared inference via Hugging Face.<br>
+        Want full-quality <strong>HD AI face swap</strong> with better reliability?
         <a href="https://www.face-swap.co/?utm_source=streamlit_faceswap&utm_medium=go_pro" target="_blank">
           Go Pro ↗
         </a>
@@ -249,9 +339,7 @@ with col2:
     st.subheader("Result")
 
     if run_button:
-        st.warning(
-            "Skip the limits — HD, priority queue & no watermark at face-swap.co"
-        )
+        st.warning("Skip the limits — HD, priority queue & no watermark at face-swap.co")
 
         if source_pil is None or target_pil is None:
             st.error("Please upload both a source and a target image.")
@@ -262,9 +350,7 @@ with col2:
 
                 st.image(out_img, caption="Result", use_container_width=True)
                 st.success("Face swap complete.")
-                st.info(
-                    "✨ Like this preview? Get HD face swaps on face-swap.co."
-                )
+                st.info("✨ Like this preview? Get HD face swaps on face-swap.co.")
 
             except Exception as e:
                 st.error(str(e))
