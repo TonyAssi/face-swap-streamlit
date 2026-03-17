@@ -1,7 +1,25 @@
 import streamlit as st
 from PIL import Image
+import numpy as np
+import insightface
+from insightface.app import FaceAnalysis
 
 st.set_page_config(page_title="Image Face Swap", layout="wide")
+
+assert insightface.__version__ >= "0.7"
+
+@st.cache_resource
+def load_models():
+    app = FaceAnalysis(name="buffalo_l")
+    app.prepare(ctx_id=-1, det_size=(640, 640))  # CPU
+    swapper = insightface.model_zoo.get_model(
+        "inswapper_128.onnx",
+        download=True,
+        download_zip=True
+    )
+    return app, swapper
+
+app, swapper = load_models()
 
 st.title("Image Face Swap (Preview)")
 st.markdown(
@@ -49,4 +67,4 @@ if run_button:
     if source_pil is None or target_pil is None:
         st.error("Please upload both a source and a target image.")
     else:
-        st.success("Images loaded correctly. Next we’ll connect InsightFace.")
+        st.success("Models loaded correctly. Next we’ll add the swap logic.")
