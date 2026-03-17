@@ -173,7 +173,7 @@ CUSTOM_CSS = """
   gap:10px;
   padding:10px 14px;
   border-radius:14px;
-  background: linear-gradient(90deg,#0ea5e9 0%, #a8a9de 100%);
+  background: linear-gradient(90deg,#22c55e 0%, #16a34a 100%);
   color:#fff !important;
   font-weight:800;
   letter-spacing:0.1px;
@@ -185,15 +185,6 @@ CUSTOM_CSS = """
   filter:brightness(1.05);
   transform: translateY(-1px);
   transition: all .15s ease;
-}
-.api-cta-hero .new {
-  background:#fff;
-  color:#0ea5e9;
-  font-weight:900;
-  padding:2px 8px;
-  border-radius:999px;
-  font-size:12px;
-  line-height:1;
 }
 .api-cta-hero .txt { font-weight:800; }
 .api-cta-hero .chev { opacity:.95; }
@@ -263,45 +254,16 @@ st.markdown(
     """
     <div class="api-cta-wrap">
       <a class="api-cta-hero"
-         style="background: linear-gradient(90deg,#22c55e 0%, #16a34a 100%);"
          href="https://www.face-swap.co/?utm_source=streamlit_faceswap&utm_medium=hero_upgrade"
          target="_blank"
          rel="noopener">
         <span class="txt">⚡ Upgrade to HD (No code)</span>
         <span class="chev">↗</span>
       </a>
-
-      <a class="api-cta-hero"
-         href="https://www.face-swap.co/api?utm_source=streamlit_faceswap&utm_medium=hero_api_new"
-         target="_blank"
-         rel="noopener">
-        <span class="new">DEV</span>
-        <span class="txt">Face Swap API</span>
-        <span class="chev">↗</span>
-      </a>
     </div>
     """,
     unsafe_allow_html=True
 )
-
-with st.sidebar:
-    st.markdown(
-        """
-### Upgrade to HD 1920x1080
-- Higher resolution face swaps
-- Priority queue
-- API access & automation
-- No watermark
-"""
-    )
-    st.link_button(
-        "Open Pro Checkout",
-        "https://www.face-swap.co/?utm_source=streamlit_faceswap&utm_medium=sidebar_pro"
-    )
-    st.link_button(
-        "API Access",
-        "https://www.face-swap.co/api?utm_source=streamlit_faceswap&utm_medium=sidebar_api"
-    )
 
 col1, col2 = st.columns(2)
 
@@ -314,16 +276,15 @@ with col1:
         type=["png", "jpg", "jpeg", "webp"],
         key="src"
     )
+    if source_image is not None:
+        source_pil = Image.open(source_image).convert("RGB")
+        st.image(source_pil, caption="Source Image", use_container_width=True)
+
     target_image = st.file_uploader(
         "Target Image (face to replace)",
         type=["png", "jpg", "jpeg", "webp"],
         key="dst"
     )
-
-    if source_image is not None:
-        source_pil = Image.open(source_image).convert("RGB")
-        st.image(source_pil, caption="Source Image", use_container_width=True)
-
     if target_image is not None:
         target_pil = Image.open(target_image).convert("RGB")
         st.image(target_pil, caption="Target Image", use_container_width=True)
