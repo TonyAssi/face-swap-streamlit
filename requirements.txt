@@ -1,6 +1,4 @@
 streamlit
-insightface
-onnxruntime
+gradio_client
 pillow
 numpy
-opencv-python-headless
