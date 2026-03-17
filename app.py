@@ -137,29 +137,6 @@ CUSTOM_CSS = """
   margin: 0 auto;
 }
 
-.sticky-cta {
-  position: sticky;
-  top: 0;
-  z-index: 999;
-  background: #a5b4fc;
-  color: #0f172a;
-  padding: 10px 14px;
-  text-align: center;
-  border-bottom: 1px solid #333;
-  display: block;
-  text-decoration: none;
-  border-radius: 10px;
-  margin-bottom: 12px;
-}
-.sticky-cta:hover { filter: brightness(0.97); }
-.sticky-cta .pill {
-  background:#4f46e5;
-  color:#fff;
-  padding:4px 10px;
-  border-radius:999px;
-  margin-left:10px;
-}
-
 .api-cta-wrap {
   display:flex;
   justify-content:center;
@@ -215,19 +192,6 @@ CUSTOM_CSS = """
 
 st.set_page_config(page_title="Image Face Swap", layout="wide")
 st.markdown(CUSTOM_CSS, unsafe_allow_html=True)
-
-st.markdown(
-    """
-    <a class="sticky-cta"
-       href="https://www.face-swap.co/?utm_source=streamlit_faceswap&utm_medium=banner"
-       target="_blank"
-       rel="noopener">
-       ⚡ <strong>Upgrade to HD</strong> — priority queue & higher resolution swaps!
-       <span class="pill">GPU</span>
-    </a>
-    """,
-    unsafe_allow_html=True
-)
 
 st.markdown(
     """
@@ -290,18 +254,11 @@ with col1:
         st.image(target_pil, caption="Target Image", use_container_width=True)
 
     run_button = st.button("Swap Face", type="primary")
-    st.link_button(
-        "⚡ Upgrade to HD on face-swap.co",
-        "https://www.face-swap.co/?utm_source=streamlit_faceswap&utm_medium=upgrade_to_hd",
-        use_container_width=True
-    )
 
 with col2:
     st.subheader("Result")
 
     if run_button:
-        st.warning("Skip the limits — HD, priority queue & no watermark at face-swap.co")
-
         if source_pil is None or target_pil is None:
             st.error("Please upload both a source and a target image.")
         else:
@@ -311,7 +268,6 @@ with col2:
 
                 st.image(out_img, caption="Result", use_container_width=True)
                 st.success("Face swap complete.")
-                st.info("✨ Like this preview? Get HD face swaps on face-swap.co.")
 
             except Exception as e:
                 st.error(str(e))
